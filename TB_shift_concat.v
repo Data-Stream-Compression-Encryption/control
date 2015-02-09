@@ -8,20 +8,20 @@ module TB_shift_concat;
 
 // Declare the inputs to be connected
 reg clk;
+reg rst;
 reg [63:0] test_value;
-reg [5:0] valid_bits;
-reg in_initial;
-reg in_zero;
+reg [6:0] valid_bits;
+reg data_valid;
+reg msg_fin;
 
 wire [63:0] out_value;
-wire scon_done;
+wire done;
 
 
 
 
 // Instantiate the Module to be tested
-
-shift_concat U1(.in(test_value),.out(out_value));
+shift_concat U1(.clk(clk),.rst(rst),.data_in(test_value),.valid_bits(valid_bits),.data_valid(data_valid),.msg_fin(msg_fin),.data_out(out_value),.done(done));
 // Stimulate the inputs
 
 // Define the input stimulus module
@@ -34,8 +34,37 @@ always
 
 // Toggle the SW inputs	
 initial begin
-	test_value <= 64'h0000000000000001;
-	counter <= 4'h0;
+  test_value = 64'h0;
+  valid_bits = 7'b0;
+  data_valid = 1'b0;
+  msg_fin = 1'b0;
+  rst = 0;
+  #4 rst = 1;
+  #8 rst = 0;
+  
+	test_value = 64'h000abcdef1234567;
+	valid_bits = 7'd52;	
+	msg_fin = 1'b0;
+	#10 data_valid = 1'b1;
+	#10 data_valid = 1'b0;
+	
+	test_value = 64'h000000000000000e;
+	valid_bits = 7'd4;	
+	msg_fin = 1'b0;
+	#10 data_valid = 1'b1;
+	#10 data_valid = 1'b0;
+	
+  test_value = 64'h000000000000ebf3;
+	valid_bits = 7'd16;	
+	msg_fin = 1'b0;
+	#10 data_valid = 1'b1;
+	#10 data_valid = 1'b0;
+	
+	test_value = 64'h00000000000000ec;
+	valid_bits = 7'd8;	
+	msg_fin = 1'b0;
+	#10 data_valid = 1'b1;
+	#10 data_valid = 1'b0;
 end
 	
 
