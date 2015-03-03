@@ -2,12 +2,16 @@
 // ==============================
 // Takes inputs of various lengths from 1 to 64 bits (data_in) 
 //    and "stacks" those inputs into 64 bit segments (data_out)
+// ==============================
+// Author: Alex Clarke
+// Date: 2/2/2015
 
 `timescale 1 ns/ 1 ps
 
-module shift_concat(clk, rst, data_in, data_valid, valid_bits, msg_fin, data_out, done);
+module shift_concat(clk, rst, stall, data_in, data_valid, valid_bits, msg_fin, data_out, done);
   input clk;
   input rst;
+  input stall;
   
   input [63:0] data_in;       // Data to "shift concatenate"
   input [6:0] valid_bits;     // Indicates number of valid bits in a particular input
@@ -41,7 +45,9 @@ module shift_concat(clk, rst, data_in, data_valid, valid_bits, msg_fin, data_out
   // Drive concat_reg
   always@(posedge clk, posedge rst)
     if( rst )
-      concat_reg <= 0;     
+      concat_reg <= 0;  
+    else if( stall )
+      concat_reg <= concat_reg;   
     else if( (data_valid) && (concat_reg_valid >= 64) )
       concat_reg <= ((data_in & valid_mask) << concat_reg_valid - 64) | (concat_reg >> 64);
     else if(concat_reg_valid >= 64)
@@ -57,7 +63,9 @@ module shift_concat(clk, rst, data_in, data_valid, valid_bits, msg_fin, data_out
   // Drive concat_reg_valid
   always@(posedge clk, posedge rst)
     if( rst )
-      concat_reg_valid <= 0;     
+      concat_reg_valid <= 0;    
+    else if ( stall )
+      concat_reg_valid <= concat_reg_valid;
     else begin                  
       if( (data_valid) && (concat_reg_valid >= 64) )
         concat_reg_valid <= concat_reg_valid + valid_bits - 64;
@@ -74,7 +82,9 @@ module shift_concat(clk, rst, data_in, data_valid, valid_bits, msg_fin, data_out
   // Drive msg_fin_reg
   always@(posedge clk, posedge rst)
     if( rst )
-      msg_fin_reg <= 0;     
+      msg_fin_reg <= 0; 
+    else if ( stall )  
+      msg_fin_reg <= msg_fin_reg;  
     else if( msg_fin )
       msg_fin_reg <= 1;
     else if( concat_reg_valid <= 64 )

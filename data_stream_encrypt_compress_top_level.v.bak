@@ -7,24 +7,33 @@ This module implements the top-level block for the Data-stream encryption and co
 
 */
 
+`timescale 1 ns/ 1 ps
 
-
-module dsec(
-  input clk,
-  input rst,
-  input [63:0] data_in,
-  input key_config,
-  input in_valid,
-  input out_rcvd,
-  output rdy,
-  output [63:0] data_out,
-  output error,
-  output done
-  );
+module dsec();
+  input clk;
+  input rst;
   
-  wire [63:0] comp_in;
+  input [63:0] data_in;
+  input key_config;
+  input in_valid;
+  input out_rcvd;
+  
+  output rdy;
+  output [63:0] data_out;
+  output error;
+  output done;  
+  
   reg [63:0] key1, key2, key3;
   wire [1:0] counter_value;
+  
+  wire[63:0] comp_in, comp_out, encrypt_in, encrypt_out;
+  wire[6:0] valid_bits;
+  
+  wire msg_fin, concat_in_valid, concat_done, stall;
+  
+  // Modules
+  counter2bit u1(.clk(clk),.rst(rst),.in_valid(in_valid),.key_config(key_config),.counter_value(counter_value));
+  shift_concat u2(.clk(clk),.rst(rst),.stall(stall),.data_in(comp_out),.data_valid(concat_in_valid),.valid_bits(valid_bits),.msg_fin(msg_fin),.data_out(encrypt_in),.done(concat_done));
   
   // Route data_in to encryption module for setting encryption keys
   assign comp_in = ( counter_value == 0 )? data_in : 64'b0;
@@ -44,9 +53,6 @@ module dsec(
           key3 <= data_in;
         end
         default: begin
-          key1 <= 64'b0; 
-          key2 <= 64'b0;
-          key3 <= 64'b0;
         end
       endcase
     else begin

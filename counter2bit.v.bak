@@ -7,6 +7,10 @@
 // Author: Alex Clarke
 // Date: 2/23/2015
 
+This module implements a 2-bit counter for data stream encryption and compression top-level module.
+
+
+
 `timescale 1 ns/ 1 ps
 
 module counter2bit(clk,rst,in_valid,key_config,counter_value);
