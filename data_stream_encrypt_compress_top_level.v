@@ -36,12 +36,15 @@ module dsec(clk,rst,data_in,key_config,in_valid,out_rcvd,rdy,data_out,error,done
   shift_concat u2(.clk(clk),.rst(rst),.stall(stall),.data_in(comp_out),.data_valid(concat_in_valid),.valid_bits(valid_bits),.msg_fin(msg_fin),.data_out(encrypt_in),.done(concat_done));
   
   // Route data_in to encryption module for setting encryption keys
-  assign comp_in = ( counter_value == 0 )? data_in : 64'b0;
+  assign comp_in = ( counter_value == 0 )? data_in : 64'bx;
   
   always@(counter_value, rst)
     if( ~rst )      
       case(counter_value)
         00: begin
+          key1 <= 64'bx; 
+          key2 <= 64'bx;
+          key3 <= 64'bx;
         end
         01: begin
           key1 <= data_in;
@@ -56,9 +59,9 @@ module dsec(clk,rst,data_in,key_config,in_valid,out_rcvd,rdy,data_out,error,done
         end
       endcase
     else begin
-      key1 <= 64'b0; 
-      key2 <= 64'b0;
-      key3 <= 64'b0;
+      key1 <= 64'bx; 
+      key2 <= 64'bx;
+      key3 <= 64'bx;
     end
 
 

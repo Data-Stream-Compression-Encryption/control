@@ -7,24 +7,26 @@
 
 `timescale 1 ns/ 1 ps
 
-module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,encry_rdy,stall);
+module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,encry_rdy,stall,shcn_done,comp_done,dump_comp);
   input clk;                
   input rst;
   
   input key_config;             // Indicates that encryption keys are being configured so stall all modules
   input in_valid;               // Indicates that valid input is present on the bus, thus modules should proceed  
   input out_rcvd;               // Indicates that the DSEC receiving device has recieved outputted data
+  input shcn_done;              // Indicates that the shift-concatenation module has filled a 64-bit register and is ready to emit data
   
   output reg stall;             // Indicates that all modules should maintain state (Asychronous)
   output reg rdy;               // Indicates that the DSEC module is ready to recieve data  
   output reg [63:0] error_code; // Identifies the last error encountered based on code
   output reg error;             // Indicates that an error occurred
-  output reg out_valid;              // Indicates that the output of the DSEC module is valid
-  
+  output reg out_valid;         // Indicates that the output of the DSEC module is valid
+  output reg dump_comp;         // Indicates to the compression module to send remaining data
   
   
   input comp_rdy;               // Indicates that the compression module is ready for input
   input encry_rdy;              // Indicates that the encryption module is ready for input
+  input shcn_done;              // Indicates that the shift-concatenation module has compiled 64-bits and the output of the module is now valid
   
   
   
