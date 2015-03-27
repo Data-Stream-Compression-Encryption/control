@@ -1,0 +1,44 @@
+/*
+
+Author: Alex Clarke
+Date: 3/24/2015
+
+This module tests the top level DSEC module
+
+*/
+
+module TB_DSEC;
+
+reg clk;
+reg rst;
+
+reg key_config;
+reg in_valid;
+reg out_rcvd;
+reg [63:0] data_in;
+
+wire [63:0] data_out;
+wire rdy, error, out_valid;
+
+dsec u1(.clk(clk),.rst(rst),.data_in(data_in),.key_config(key_config),.in_valid(in_valid),.out_rcvd(out_rcvd),.rdy(rdy),.data_out(data_out),.error(error),.out_valid(out_valid));
+ 
+// Generate a 50 MHz clock
+initial
+	clk = 1'b0;
+always
+	#10 clk = ~clk; 
+	
+initial begin
+  rst = 1'b0;
+  key_config = 1'b0;
+  in_valid = 1'b1;
+  out_rcvd = 1'b1;
+  data_in = 64'h9474B8E8C73BCA7D;
+    
+	  
+end
+
+
+
+  
+endmodule

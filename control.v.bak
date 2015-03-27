@@ -7,14 +7,15 @@
 
 `timescale 1 ns/ 1 ps
 
-module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,encry_rdy,stall,shcn_done,comp_done);
+module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,stall, scon_done,dump_comp, valid_bits, valid_to_comp);
   input clk;                
   input rst;
   
-  input key_config;             // Indicates that encryption keys are being configured so stall all modules
-  input in_valid;               // Indicates that valid input is present on the bus, thus modules should proceed  
+  input key_config;             // Indicates that encryption keys are being configured 
+  input in_valid;               // Indicates that valid input is present on the bus
   input out_rcvd;               // Indicates that the DSEC receiving device has recieved outputted data
-  input shcn_done;              // Indicates that the shift-concatenation module has filled a 64-bit register and is ready to emit data
+  input [6:0] valid_bits;             // Indicates the number of valid bits presented on the output of the compression module
+  
   
   output reg stall;             // Indicates that all modules should maintain state (Asychronous)
   output reg rdy;               // Indicates that the DSEC module is ready to recieve data  
@@ -22,30 +23,33 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   output reg error;             // Indicates that an error occurred
   output reg out_valid;         // Indicates that the output of the DSEC module is valid
   output reg dump_comp;         // Indicates to the compression module to send remaining data
-  
+  output reg valid_to_comp;
   
   input comp_rdy;               // Indicates that the compression module is ready for input
-  input encry_rdy;              // Indicates that the encryption module is ready for input
-  input shcn_done;              // Indicates that the shift-concatenation module has compiled 64-bits and the output of the module is now valid
-  
-  
+  //input encry_rdy;              // Indicates that the encryption module is ready for input
+  input scon_done;              // Indicates that the shift-concatenation module has compiled 64-bits and the output of the module is now valid
+
   
   // reg error_reg;             // Indicates error
   // wire out_rcvd_since_done;  // Indicates whether out_rcvd was driven high since the last done was driven high
+  
+  // ==============================
+  // Register drivers
+  // ==============================
+  
+
   
   // ==============================
   // Output drivers
   // ==============================
   
   // Drive stall signal
-  always@(rst,in_valid,key_config,done,out_rcvd,error) begin
-    if(rst)
-      stall <= 1'b0;
-    else if ( in_valid == 1'b0 )
+  always@(in_valid,key_config,out_valid,out_rcvd,error) begin
+    if ( in_valid == 1'b0 )
       stall <= 1'b1;
     else if( key_config == 1'b1 )
       stall <= 1'b1;
-    else if( (done == 1'b1) && (out_rcvd == 1'b0) )
+    else if( (out_valid == 1'b1) && (out_rcvd == 1'b0) )
       stall <= 1'b1;
     else if( error == 1'b1)
       stall <= 1'b1;
@@ -56,21 +60,44 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Drive rdy signal
   always@(comp_rdy) begin
     if(comp_rdy == 1'b1)
-      rdy == 1'b1;
+      rdy = 1'b1;
     else
-      rdy == 1'b0;
+      rdy = 1'b0;
+  end
+  
+  // Drive valid_to_comp
+  always@(in_valid,key_config) begin
+    if( key_config )
+      valid_to_comp <= 1'b0;
+    else if( ~in_valid )
+      valid_to_comp <= 1'b0;
+    else
+      valid_to_comp <= 1'b1;
   end
   
   // Drive error code
-  // ...
+  
   
   // Drive error
-  // ...
+  always@(in_valid,rdy) begin
+    if(in_valid && ~rdy)
+      error <= 1;
+    else
+      error <= 0;
+        
+  end
   
-  // Drive done 
-  
-  
-  
+  // Drive out_valid 
+  always@(posedge clk, posedge rst) begin
+    if(rst)
+      out_valid <= 0;
+    else if(scon_done)
+      out_valid <= 1;
+    else
+      out_valid <= 0;
+      
+  end
+
   
   
 endmodule
