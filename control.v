@@ -14,7 +14,7 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   input key_config;             // Indicates that encryption keys are being configured 
   input in_valid;               // Indicates that valid input is present on the bus
   input out_rcvd;               // Indicates that the DSEC receiving device has recieved outputted data
-  input [6:0] valid_bits;             // Indicates the number of valid bits presented on the output of the compression module
+  input [6:0] valid_bits;       // Indicates the number of valid bits presented on the output of the compression module
   
   
   output reg stall;             // Indicates that all modules should maintain state (Asychronous)
@@ -23,12 +23,14 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   output reg error;             // Indicates that an error occurred
   output reg out_valid;         // Indicates that the output of the DSEC module is valid
   output reg dump_comp;         // Indicates to the compression module to send remaining data
-  output reg valid_to_comp;
+  output reg valid_to_comp;     // Indicates that the data input to the compression module is valid
   
   input comp_rdy;               // Indicates that the compression module is ready for input
   //input encry_rdy;              // Indicates that the encryption module is ready for input
   input scon_done;              // Indicates that the shift-concatenation module has compiled 64-bits and the output of the module is now valid
 
+  reg data_rcvd;                // Indicates whether data on the output of the top-level module has been received since the last new data was put on the bus
+  
   
   // reg error_reg;             // Indicates error
   // wire out_rcvd_since_done;  // Indicates whether out_rcvd was driven high since the last done was driven high
@@ -37,6 +39,15 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Register drivers
   // ==============================
   
+  always@( out_rcvd, rst, out_valid)
+    if(rst)
+      data_rcvd <= 1'b0;
+    else if(out_valid == 1'b0)
+      data_rcvd <= 1'b0;
+    else if(out_rcvd == 1'b1)
+      data_rcvd <= 1'b1;
+    else
+      data_rcvd <= data_rcvd;
 
   
   // ==============================
@@ -44,12 +55,8 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // ==============================
   
   // Drive stall signal
-  always@(in_valid,key_config,out_valid,out_rcvd,error) begin
-    if ( in_valid == 1'b0 )
-      stall <= 1'b1;
-    else if( key_config == 1'b1 )
-      stall <= 1'b1;
-    else if( (out_valid == 1'b1) && (out_rcvd == 1'b0) )
+  always@(key_config,data_rcvd,error) begin
+    if( key_config == 1'b1 )
       stall <= 1'b1;
     else if( error == 1'b1)
       stall <= 1'b1;
@@ -89,11 +96,13 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Drive out_valid 
   always@(posedge clk, posedge rst) begin
     if(rst)
-      out_valid <= 0;
+      out_valid <= 1'b0;
+    else if(key_config)
+      out_valid <= 1'b0;
     else if(scon_done)
-      out_valid <= 1;
+      out_valid <= 1'b1;
     else
-      out_valid <= 0;
+      out_valid <= 1'b0;
       
   end
 

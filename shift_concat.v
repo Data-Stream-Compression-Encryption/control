@@ -45,7 +45,7 @@ module shift_concat(clk, rst, stall, data_in, /* data_valid */, valid_bits, msg_
   // Drive concat_reg
   always@(posedge clk, posedge rst)
     if( rst )
-      concat_reg <= 0;  
+      concat_reg <= 128'b0;  
     else if( stall )
       concat_reg <= concat_reg;   
     else if( (valid_bits > 7'b0) && (concat_reg_valid >= 64) )

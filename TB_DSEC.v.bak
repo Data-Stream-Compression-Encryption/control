@@ -29,12 +29,44 @@ always
 	#10 clk = ~clk; 
 	
 initial begin
-  rst = 1'b0;
+  rst = 1'b1;
+  #20 rst = 1'b0;
   key_config = 1'b0;
-  in_valid = 1'b1;
-  out_rcvd = 1'b1;
+  in_valid = 1'b0;
+  out_rcvd = 1'b0;
+  
+  
+  #20 key_config = 1'b1;
   data_in = 64'h9474B8E8C73BCA7D;
-    
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  data_in = 64'h8DA744E0C94E5E17;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  data_in = 64'h0CDB25E3BA3C6D79;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  key_config = 1'b0;
+   
+  data_in = 64'h9474B8E8C73BCA7D;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0; 
+  
+  #20 key_config = 1'b1;
+  data_in = 64'h0CDB25E3BA3C6D79;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  data_in = 64'h4784C4BA5006081F;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  data_in = 64'h1CF1FC126F2EF842;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0;
+  key_config = 1'b0;
+   
+  data_in = 64'h0CDB25E3BA3C6D79;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0; 
 	  
 end
 
