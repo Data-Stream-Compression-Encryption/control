@@ -70,6 +70,10 @@ initial begin
   data_in = 64'h0CDB25E3BA3C6D79;
   #20 in_valid = 1'b1;
   #20 in_valid = 1'b0; 
+  
+  data_in = 64'h0000000000000000;
+  #20 in_valid = 1'b1;
+  #20 in_valid = 1'b0; 
 	  
 end
 

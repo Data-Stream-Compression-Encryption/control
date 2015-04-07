@@ -8,7 +8,7 @@
 
 `timescale 1 ns/ 1 ps
 
-module shift_concat(clk, rst, stall, data_in, /* data_valid */, valid_bits, msg_fin, data_out, done);
+module shift_concat(clk, rst, stall, data_in, /* data_valid ,*/ valid_bits, msg_fin, data_out, done);
   input clk;
   input rst;
   input stall;
@@ -31,12 +31,12 @@ module shift_concat(clk, rst, stall, data_in, /* data_valid */, valid_bits, msg_
   // Output drivers
   // ==============================
   
-  assign data_out = concat_reg;
-  assign done = ( concat_reg_valid >= 64 )? 1 : 
-                  (msg_fin_reg)? 1 : 
-                  0 ;
+  assign data_out = concat_reg[63:0];
+  assign done = ( concat_reg_valid >= 64 )? 1'b1 : 
+                  (msg_fin_reg)? 1'b1 : 
+                  1'b0 ;
                   
-  assign valid_mask = 64'hffffffffffffffff >> (64 - valid_bits);
+  assign valid_mask = 64'hffffffffffffffff >> (7'd64 - valid_bits);
   
   // ==============================
   // register drivers
@@ -49,9 +49,9 @@ module shift_concat(clk, rst, stall, data_in, /* data_valid */, valid_bits, msg_
     else if( stall )
       concat_reg <= concat_reg;   
     else if( (valid_bits > 7'b0) && (concat_reg_valid >= 64) )
-      concat_reg <= ((data_in & valid_mask) << concat_reg_valid - 64) | (concat_reg >> 64);
+      concat_reg <= ((data_in & valid_mask) << concat_reg_valid - 8'd64) | (concat_reg >> 64);
     else if(concat_reg_valid >= 64)
-      concat_reg <= concat_reg >> 64;
+      concat_reg <= concat_reg >> 8'd64;
     else if(valid_bits > 7'b0)  
       concat_reg <= (concat_reg)|((data_in & valid_mask) << concat_reg_valid);
     else if (msg_fin_reg)
@@ -68,9 +68,9 @@ module shift_concat(clk, rst, stall, data_in, /* data_valid */, valid_bits, msg_
       concat_reg_valid <= concat_reg_valid;
     else begin                  
       if( (valid_bits > 7'b0) && (concat_reg_valid >= 64) )
-        concat_reg_valid <= concat_reg_valid + valid_bits - 64;
-      else if(concat_reg_valid >= 64)
-        concat_reg_valid <= concat_reg_valid - 64;
+        concat_reg_valid <= concat_reg_valid + valid_bits - 8'd64;
+      else if(concat_reg_valid >= 8'd64)
+        concat_reg_valid <= concat_reg_valid - 8'd64;
       else if((valid_bits > 7'b0) && (valid_bits != 64'b0) )
         concat_reg_valid <= concat_reg_valid + valid_bits;
       else if(msg_fin_reg)

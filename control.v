@@ -57,11 +57,11 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Drive stall signal
   always@(key_config,data_rcvd,error) begin
     if( key_config == 1'b1 )
-      stall <= 1'b1;
+      stall = 1'b1;
     else if( error == 1'b1)
-      stall <= 1'b1;
+      stall = 1'b1;
     else
-      stall <= 1'b0;   
+      stall = 1'b0;   
   end
   
   // Drive rdy signal
@@ -75,11 +75,11 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Drive valid_to_comp
   always@(in_valid,key_config) begin
     if( key_config )
-      valid_to_comp <= 1'b0;
+      valid_to_comp = 1'b0;
     else if( ~in_valid )
-      valid_to_comp <= 1'b0;
+      valid_to_comp = 1'b0;
     else
-      valid_to_comp <= 1'b1;
+      valid_to_comp = 1'b1;
   end
   
   // Drive error code
