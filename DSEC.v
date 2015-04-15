@@ -29,19 +29,19 @@ module dsec(clk,rst,data_in,key_config,in_valid,out_rcvd,rdy,data_out,error,out_
   wire[63:0] comp_out, encrypt_in, encrypt_out, error_code;
   wire[6:0] valid_bits;
   
-  wire scon_done, stall, comp_rdy, dump_comp, valid_to_comp, dump;
+  wire scon_done, stall, comp_rdy, dump_comp, valid_to_comp;
   
   // Modules
   counter2bit counter2bit1(.rst(rst),.in_valid(in_valid),.key_config(key_config),.count(counter_value));
   shift_concat shift_concat1(.clk(clk),.rst(rst),.stall(stall),.data_in(comp_out),.valid_bits(valid_bits),.msg_fin(dump),.data_out(encrypt_in),.done(scon_done));
   control control1(.clk(clk),.rst(rst),.key_config(key_config),.in_valid(in_valid),.out_rcvd(out_rcvd),.rdy(rdy),.error(error),.error_code(error_code),.out_valid(out_valid),.comp_rdy(comp_rdy),.stall(stall), .scon_done(scon_done),.dump_comp(dump_comp), .valid_bits(valid_bits), .valid_to_comp(valid_to_comp));
-  //dummy_compression dummy_compression1(.clk(clk),.rst(rst),.valid_to_comp(valid_to_comp),.valid_bits(valid_bits),.comp_rdy(comp_rdy),.stall_comp(stall),.dump(dump),.data_in(comp_in),.data_out(comp_out));
-  Compression_Top #(.COMP_POINT(3)) compression1(.clock(clk), .reset(~rst), .stall(stall), .data_in_valid(valid_to_comp),.data_in(comp_in),.comp_rdy(comp_rdy), .dump(dump),.valid_bits(valid_bits),.data_out(comp_out));
+  dummy_compression dummy_compression1(.clk(clk),.rst(rst),.valid_to_comp(valid_to_comp),.valid_bits(valid_bits),.comp_rdy(comp_rdy),.stall_comp(stall),.dump(dump),.data_in(comp_in),.data_out(comp_out));
+  //Compression_Top compression1(.clock(clk), .reset(~rst), .stall(stall), .data_in_valid(valid_to_comp),.data_in(comp_in),.comp_rdy(comp_rdy), .dump(dump_comp),.valid_bits(valid_bits),.data_out(comp_out));
   TripleDES_Encryption TripleDES_Encryption1(.data_in(encrypt_in), .data_out(encrypt_out), .key_1(key_1), .key_2(key_2), .key_3(key_3));
   
   
   //assign comp_in = ( counter_value == 0 )? data_in : 64'bx;
-  assign valid_to_comp = ( (counter_value == 0) && in_valid )? 1'b1 : 1'b0;
+  //assign valid_to_comp = ( (counter_value == 0) && in_valid )? 1'b1 : 1'b0;
   
   // Drive encryption key registers
   always@(posedge rst, posedge clk) begin
