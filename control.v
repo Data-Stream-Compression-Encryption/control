@@ -94,8 +94,8 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   end
   
   // Drive out_valid 
-  always@(posedge clk, posedge rst) begin
-    if(rst)
+  always@(posedge clk, negedge rst) begin
+    if(~rst)
       out_valid <= 1'b0;
     else if(key_config)
       out_valid <= 1'b0;

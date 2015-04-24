@@ -18,8 +18,8 @@ module counter2bit(rst,in_valid,key_config,count);
   output reg [1:0] count; // Counter value output, mirrors count reg 
     
 
-  always@(posedge in_valid, posedge rst) begin
-    if(rst == 1'b1) begin
+  always@(posedge in_valid, negedge rst) begin
+    if(~rst) begin
       count <= 2'b0;
     end else if(key_config == 1'b0) begin
       count <= 2'b0;
