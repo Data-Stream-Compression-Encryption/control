@@ -13,6 +13,7 @@
 // output		          		DRAM_RAS_N;
 // output		          		DRAM_WE_N;
 
+`timescale 1 ns/ 1 ps
 
 module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram_cs_n, dram_dq, dram_dqm, dram_ras_n, dram_we_n, dataToWrite, dataToRead, address, w_rn, go, valid, led);
 	
@@ -54,7 +55,6 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	//
 
 	
-	//assign dram_we_n = 1'b1;
 	assign dram_ba = 2'b00;
 	assign dram_dqm = 4'b0;
 	
@@ -64,50 +64,89 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 
 	
 	// State Variables
-	reg [3:0] curState;
-	reg [3:0] nextState;
+	reg [4:0] curState;
+	reg [4:0] nextState;
 	//
 	
+	// Write command RAS = 1 , CAS = 0, WE = 0
+	// Read command RAS = 1 , CAS = 0, WE = 1
+	// Idle command RAS = 1 , CAS = 1, WE = 1
+	// Active command RAS = 0 , CAS = 1, WE = 1
+	// Burst TERMINATE command RAS = 1 , CAS = 1, WE = 0
+	// No-Op command RAS = 1 , CAS = 1, WE = 1
+	// Mode Register select (MRS) RAS = 0 , CAS = 0, WE = 0
+	// Precharge all banks command RAS = 0  , CAS = 1 , WE = 1
+	// Auto Refresh command RAS = 0  , CAS = 0 , WE = 1
+	
 	// States
-	parameter [3:0] IDLE = 4'd0;				// Do nothing
-	parameter [3:0] ACTIVE = 4'd1;			// Activate RAM row or whatever
-	parameter [3:0] READ_BEGIN = 4'd2;		// Set RAM module for reading
-	parameter [3:0] READ_WAIT1 = 4'd3;		// Wait for CAS latency 
-	parameter [3:0] READ_WAIT2 = 4'd4;		// Wait for CAS latency 
-	parameter [3:0] READ1 = 4'd5;				// Read incoming data first half
-	parameter [3:0] ACTIVE_WAIT1 = 4'd6;	// Wait 2 clocks cycles for row to be activated (1st clock)
-	parameter [3:0] ACTIVE_WAIT2 = 4'd7;	// Wait 2 clocks cycles for row to be activated (2nd clock)			
-	parameter [3:0] READ2 = 4'd8;				// Read incoming data second half
-	parameter [3:0] WRITE1 = 4'd9;			// Set RAM module for writing and write least significant word
-	parameter [3:0] WRITE2 = 4'd10;			// Write most significant word
-	parameter [3:0] TERMINATE = 4'd11;		// Terminate current action
+	parameter [4:0] IDLE = 5'd0;												// Do nothing
+	parameter [4:0] ACTIVE = 5'd1;										// Activate RAM row or whatever
+	parameter [4:0] READ_BEGIN = 5'd2;						// Set RAM module for reading
+	parameter [4:0] READ_WAIT1 = 5'd3;					// Wait for CAS latency 
+	parameter [4:0] READ_WAIT2 = 5'd4;					// Wait for CAS latency 
+	parameter [4:0] READ1 = 5'd5;										// Read incoming data first half
+	parameter [4:0] ACTIVE_WAIT1 = 5'd6;				// Wait 2 clocks cycles for row to be activated (1st clock)
+	parameter [4:0] ACTIVE_WAIT2 = 5'd7;				// Wait 2 clocks cycles for row to be activated (2nd clock)			
+	parameter [4:0] READ2 = 5'd8;										// Read incoming data second half
+	parameter [4:0] WRITE1 = 5'd9;									// Set RAM module for writing and write least significant word
+	parameter [4:0] WRITE2 = 5'd10;								// Write most significant word
+	parameter [4:0] TERMINATE = 5'd11;						// Terminate current action
+	parameter [4:0] MRS = 5'd12;											// Mode Register Select - Configure the memory
+	parameter [4:0] POWERUP = 5'd13;							// Initial powerup delay state
+	parameter [4:0] PRECHARGE_AB = 5'd14;		// Precharge all banks, bust be performed before MRS initialization	
+	parameter [4:0] INIT_REFRESH = 5'd15;  		// Required intital refresh operation repeated 8 times
+	parameter [4:0] INIT_REFRESH_BACKOFF =5'd16;		// Wait tstat between initial refresh operations
+	parameter [4:0] MRS_DELAY	=	5'd17;				// Delay required to set mode register fully
 	//
 	
 	// Delay Variables
 	parameter [1:0] CAS_LATENCY = 2'd2;
 	
 	reg [1:0] readWait;
+	reg [12:0] powerupCounter;
+	parameter [12:0] POWERUP_WAIT_PERIOD = 13'd5000;
+	
+	reg [3:0] initRefreshWaitCounter;
+	reg [3:0] initRefreshBackoffCounter;	
+	parameter [3:0] INIT_REFRESH_PERIOD = 4'd8;
+	parameter [3:0] INIT_REFRESH_BACKOFF_PERIOD = 4'd7;
+	
 	//
+	
+	// RAM Mode for MRS configuration/////cba9876543210
+	parameter [12:0] MEM_MODE = 13'b0001000110001;
+	//
+	
 	
 	// Data storage
 	reg [63:0] writeData;   // Store data for writing
+	reg [31:0] writeDataHalf;
+	
+	reg [12:0] curAddress;
 	//
 	
-	// Current Command (read=0, write=1)
-	reg command;
+	// Signals
+	reg command;			// Current Command (read=0, write=1)
+	reg writeNow;
+	//
+	
+	// Command parameters
+	parameter WRITE = 1'b1;
+	parameter READ = 1'b0;
+	//
 
 	
 	// State Transitions 	
 	always@(posedge clk, negedge rst) begin
 			if(~rst) 
-				curState <= IDLE;
+				curState <= POWERUP;
 			else	
 				curState <= nextState;	
 	end
 	//
 	
 	// State Machine
-	always@(curState,go,command) begin
+	always@(curState,go,command,powerupCounter,initRefreshBackoffCounter, initRefreshWaitCounter) begin
 		case(curState)
 			IDLE: begin
 				if(go)begin
@@ -133,22 +172,50 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 			end
 			READ_WAIT1:
 				nextState = READ_WAIT2;
-			READ_WAIT2:
+			READ_WAIT2:begin
 				nextState = READ1;
+			end
 			READ1:begin
 				nextState = READ2;				
 			end
 			READ2:begin
-				nextState = TERMINATE;				
+				nextState = IDLE;
 			end
-			WRITE1:begin
-				nextState = WRITE2;				
+			WRITE1:begin				
+				nextState = WRITE2;								
 			end
 			WRITE2:begin
-				nextState = TERMINATE;				
+				nextState = IDLE;
 			end
-			TERMINATE:begin
-				nextState = IDLE;				
+			MRS:begin
+				nextState = MRS_DELAY;
+			end
+			MRS_DELAY:begin
+				nextState = IDLE;
+			end
+			POWERUP: begin
+				if(powerupCounter > POWERUP_WAIT_PERIOD)begin
+					nextState = PRECHARGE_AB;
+				end else begin
+					nextState = POWERUP;
+				end
+			end
+			PRECHARGE_AB: begin
+				nextState = INIT_REFRESH_BACKOFF;
+			end
+			INIT_REFRESH_BACKOFF:begin
+				if(initRefreshBackoffCounter >= INIT_REFRESH_BACKOFF_PERIOD)begin
+					if(initRefreshWaitCounter >= INIT_REFRESH_PERIOD)begin
+						nextState = MRS;
+					end else begin
+						nextState = INIT_REFRESH;
+					end					
+				end else begin
+					nextState = INIT_REFRESH_BACKOFF;
+				end
+			end
+			INIT_REFRESH:begin
+				nextState = INIT_REFRESH_BACKOFF;
 			end
 			default:
 				nextState = IDLE;
@@ -160,9 +227,9 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	always@(posedge clk, negedge rst) begin
 		if(~rst) begin
 			valid <= 1'b0;
-		end else if (curState == READ2) begin
+		end else if (curState==READ2) begin
 			valid <= 1'b1;
-		end else if (curState == TERMINATE && command == 1'b1) begin
+		end else if (curState==WRITE2) begin
 			valid <= 1'b1;
 		end else
 			valid <= 1'b0;
@@ -170,29 +237,53 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	//
 	
 	
-	// Drive Address
-	assign dram_addr = 0;
+	// Drive dram_addr
+	assign dram_addr = curAddress;
+	//
+	
+	// Drive curAddress
+	always@(negedge clk, negedge rst) begin
+		if(~rst) begin	
+			curAddress <= 13'b0010000000000;
+		end else if(curState == IDLE) begin
+			curAddress <= {address[12:11],1'b1,address[9:0]};
+		end else if(curState == READ_WAIT1) begin
+			curAddress <= curAddress + 13'd1;
+		end else if(curState == WRITE2) begin
+			curAddress <= curAddress + 13'd1;	
+		end else if(curState == POWERUP) begin
+			curAddress <= MEM_MODE;
+		end else begin
+			curAddress <= curAddress;
+		end
+	end
 	//
 	
 	
 	// Drive dram_dq
-	assign dram_dq = (~rst)? 32'hzzzzzzzz :
-		(curState == WRITE1)? writeData[63:32] :
-		(curState == WRITE2)? writeData[31:0] :
+	assign dram_dq = (writeNow)? writeDataHalf :
 		32'hzzzzzzzz;
 	//
 	
 	
-	// Drive dataToRead
+	// Drive dataToRead 
 	always@(posedge clk ,negedge rst) begin
 		if(~rst) begin
 			dataToRead <= 64'b0;
-			led[7] <= 1'b0;
+			led[0] <= 1'b0;	
+			led[1] <= 1'b0;
 		end else if(curState == READ1) begin
-			dataToRead <= {dram_dq,32'b0};  
+			dataToRead <= {dram_dq,32'h10101010}; 
+			if(curAddress == 13'd0)begin
+				led[0] <= 1'b1;
+			end else begin
+			end
 		end else if(curState == READ2) begin
-			dataToRead <= {dram_dq,dataToRead[31:0]};  // down showing data  //{msw,lsw}
-			led[7] <= 1'b1;
+			if(curAddress == 13'd1)begin
+				led[1] <= 1'b1;
+			end else begin
+			end
+			dataToRead <= {dataToRead[63:32],dram_dq};  // down showing data  //{msw,lsw}			
 		end else begin
 			dataToRead <= dataToRead;
 		end
@@ -211,10 +302,56 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	end
 	//
 	
-	// Write and Read
-	parameter WRITE = 1'b1;
-	parameter READ = 1'b1;
+	// Drive writeDataHalf and writeNow
+	always@(negedge clk ,negedge rst) begin
+		if(~rst) begin
+			writeDataHalf <= 32'd0;
+			writeNow <= 1'd0;
+			led[17] <= 1'b0;
+			led[16] <= 1'b0;
+			led[15] <= 1'b0;
+		end else if(curState == WRITE1) begin			
+			writeDataHalf <= writeData[63:32];
+			writeNow <= 1'd1;
+			if(curAddress == 13'd0)begin
+				led[17] <= 1'b1;
+			end else begin
+			end			
+		end else if(curState == WRITE2) begin
+			writeDataHalf <= writeData[31:0];
+			writeNow <= 1'd1;
+			if(curAddress == 13'd1)begin
+				led[16] <= 1'b1;	
+			end else if(curAddress == 13'd0)begin
+				led[15] <= 1'b1;
+			end else begin
+			end
+		end else begin
+			writeDataHalf <= 32'hdeadbeef;//writeDataHalf;
+			writeNow <= 1'd0;
+		end
+	end
 	//
+	
+	/*
+	// Drive writeSecond
+	always@(posedge clk ,negedge rst) begin
+		if(~rst) begin
+			writeSecond <= 1'b0;
+			led[4] <= 1'b0;
+			led[5] <= 1'b0;
+		end else if(curState == IDLE) begin
+			writeSecond <= 1'b0;
+			led[5] <= 1'b1;
+		end else if(nextState == WRITE1) begin
+			writeSecond <= 1'b1;
+			led[4] <= 1'b1;			
+		end else begin
+			writeSecond <= writeSecond;
+		end
+	end
+	//
+	*/
 	
 	// Drive command
 	always@(posedge clk, negedge rst) begin
@@ -223,7 +360,7 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 		end else if (go && curState == IDLE) begin
 			command <= w_rn;
 		end else
-			command <= 1'b0;
+			command <= command;
 	end
 	//
 	
@@ -234,9 +371,12 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	// Active command RAS = 0 , CAS = 1, WE = 1
 	// Burst TERMINATE command RAS = 1 , CAS = 1, WE = 0
 	// No-Op command RAS = 1 , CAS = 1, WE = 1
+	// Mode Register select (MRS) RAS = 0 , CAS = 0, WE = 0
+	// Precharge all banks command RAS = 0  , CAS = 1 , WE = 1
+	// Auto Refresh command RAS = 0  , CAS = 0 , WE = 1
 	
 	// Drive RAS, CAS, and WE
-	always@(posedge clk, negedge rst) begin
+	always@(negedge clk, negedge rst) begin
 		if(~rst) begin
 			dram_ras_n <= 1'b1;
 			dram_cas_n <= 1'b1;
@@ -251,7 +391,7 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 			dram_we_n <= 1'b1;
 		end else if(curState == READ_WAIT1) begin
 			dram_ras_n <= 1'b1;
-			dram_cas_n <= 1'b1;
+			dram_cas_n <= 1'b0;
 			dram_we_n <= 1'b1;
 		end else if(curState == READ_WAIT2) begin
 			dram_ras_n <= 1'b1;
@@ -276,7 +416,7 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 		end else if(curState == READ2) begin
 			dram_ras_n <= 1'b1;
 			dram_cas_n <= 1'b1;
-			dram_we_n <= 1'b1;	
+			dram_we_n <= 1'b1;
 		end else if(curState == WRITE1) begin
 			dram_ras_n <= 1'b1;
 			dram_cas_n <= 1'b0;
@@ -288,7 +428,27 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 		end else if(curState == TERMINATE) begin
 			dram_ras_n <= 1'b1;
 			dram_cas_n <= 1'b1;
-			dram_we_n <= 1'b0;				
+			dram_we_n <= 1'b0;
+		end else if(curState == MRS) begin
+			dram_ras_n <= 1'b0;
+			dram_cas_n <= 1'b0;
+			dram_we_n <= 1'b0;
+		end else if(curState == POWERUP) begin
+			dram_ras_n <= 1'b1;
+			dram_cas_n <= 1'b1;
+			dram_we_n <= 1'b1;
+		end else if(curState == PRECHARGE_AB) begin
+			dram_ras_n <= 1'b0;
+			dram_cas_n <= 1'b1;
+			dram_we_n <= 1'b1;
+		end else if(curState == INIT_REFRESH_BACKOFF) begin
+			dram_ras_n <= 1'b1;
+			dram_cas_n <= 1'b1;
+			dram_we_n <= 1'b1;
+		end else if(curState == INIT_REFRESH) begin
+			dram_ras_n <= 1'b0;
+			dram_cas_n <= 1'b0;
+			dram_we_n <= 1'b1;
 		end else begin
 			dram_ras_n <= 1'b1;
 			dram_cas_n <= 1'b1;
@@ -296,81 +456,68 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 		end						
 	end		
 	//
+
 	
+
+		
+	// Drive powerupCounter
+	always@(posedge clk, negedge rst) begin
+		if(~rst) begin
+			powerupCounter <= 13'd0;
+		end else if(curState == POWERUP) begin
+			powerupCounter <= powerupCounter + 13'd1;
+		end else begin
+		end	
+	end
+	//
 	
-	// TEST/TROUBLESHOOTING
+	// Drive initRefreshWaitCounter
+	always@(posedge clk, negedge rst) begin
+		if(~rst) begin	
+			initRefreshWaitCounter <= 4'd0;
+		end else if( curState==INIT_REFRESH )begin
+			initRefreshWaitCounter <= initRefreshWaitCounter + 4'd1;
+		end else begin
+			initRefreshWaitCounter <= initRefreshWaitCounter;
+		end
+	end
+	//
+	
+	// Drive initRefreshBackoffCounter
+	always@(posedge clk, negedge rst) begin
+		if(~rst) begin	
+			initRefreshBackoffCounter <= 4'd0;
+		end else if (curState==INIT_REFRESH_BACKOFF)begin
+			initRefreshBackoffCounter <= initRefreshBackoffCounter + 4'd1;
+		end else begin
+			initRefreshBackoffCounter <= 4'd0;
+		end
+	end
+	//
+	
+
+	
+	// TroUBLESHOOTING
 	always@(posedge clk, negedge rst) begin
 		if(~rst) begin
 			
-			led[17] <= 1'b0;
-			led[16] <= 1'b0;
-			led[15] <= 1'b0;
 			led[14] <= 1'b0;
 			
 			led[13] <= 1'b0;
 			led[12] <= 1'b0;
 			led[11] <= 1'b0;
 			led[10] <= 1'b0;
-		end else if(dram_dq == 32'hffffffff) begin
-			if(curState == READ1) begin
-				led[17] <= 1'b1;
-			end if(curState == READ2) begin
-				led[16] <= 1'b1;
-			end else if(curState == IDLE)begin
-				led[15] <= 1'b1;
-			end else begin
-				led[14] <= 1'b1;
-			end
-		end else if(dram_dq == 32'h00000000) begin
-			if(curState == READ1) begin
-				led[13] <= 1'b1;
-			end if(curState == READ2) begin
-				led[12] <= 1'b1;
-			end else if(curState == IDLE)begin
-				led[11] <= 1'b1;
-			end else begin
-				led[10] <= 1'b1;
-			end
+			led[2] <= 1'b0;
+			led[3] <= 1'b0;
+		end else if(curState == WRITE1) begin
+		end else if(curState == WRITE2) begin
+		
 		end else begin
-		end
-		
-		
+		end		
 	end
 	//
 	
-	always@(posedge clk, negedge rst) begin
-		if(~rst) begin
-			led[0] <= 1'b0;
-			led[1] <= 1'b0;
-		end else if(ACTIVE_WAIT2) begin
-				if(~command) begin
-					led[0] <= 1'b1;
-				end else begin
-					led[1] <= 1'b1;
-				end	
-		end else begin
-		
-		end		
-	end
-	
-	always@(posedge clk, negedge rst) begin
-		if(~rst) begin
-			led[9] <= 1'b0;
-			led[8] <= 1'b0;
-		end else if(curState == READ2) begin
-			if(dataToWrite == 64'h0000000000000000)begin
-				led[9] <= 1'b1;
-			end else if(valid == 1'b0)begin
-				led[8] <= 1'b1;
-			end else begin
-			end
-		end else begin
-		end
-		
-	end
-		
 
-	
 	
 endmodule
 
