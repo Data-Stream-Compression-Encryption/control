@@ -42,7 +42,7 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	input w_rn;					//Indicates whether to write (1) or read (0)
 	input go;
 	output reg valid;
-	output reg [17:0] led;
+	output reg [9:0] led;
 	//
 	
 	//
@@ -102,7 +102,7 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	// Delay Variables
 	parameter [1:0] CAS_LATENCY = 2'd2;
 	
-	reg [1:0] readWait;
+	
 	reg [12:0] powerupCounter;
 	parameter [12:0] POWERUP_WAIT_PERIOD = 13'd5000;
 	
@@ -244,9 +244,9 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	// Drive curAddress
 	always@(negedge clk, negedge rst) begin
 		if(~rst) begin	
-			curAddress <= 13'b0010000000000;
+			curAddress <= 13'b0000000000000;
 		end else if(curState == IDLE) begin
-			curAddress <= {address[12:11],1'b1,address[9:0]};
+			curAddress <= {address[12:11],1'b0,address[9:0]};
 		end else if(curState == READ_WAIT1) begin
 			curAddress <= curAddress + 13'd1;
 		end else if(curState == WRITE2) begin
@@ -270,19 +270,9 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	always@(posedge clk ,negedge rst) begin
 		if(~rst) begin
 			dataToRead <= 64'b0;
-			led[0] <= 1'b0;	
-			led[1] <= 1'b0;
 		end else if(curState == READ1) begin
 			dataToRead <= {dram_dq,32'h10101010}; 
-			if(curAddress == 13'd0)begin
-				led[0] <= 1'b1;
-			end else begin
-			end
 		end else if(curState == READ2) begin
-			if(curAddress == 13'd1)begin
-				led[1] <= 1'b1;
-			end else begin
-			end
 			dataToRead <= {dataToRead[63:32],dram_dq};  // down showing data  //{msw,lsw}			
 		end else begin
 			dataToRead <= dataToRead;
@@ -307,23 +297,17 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 		if(~rst) begin
 			writeDataHalf <= 32'd0;
 			writeNow <= 1'd0;
-			led[17] <= 1'b0;
-			led[16] <= 1'b0;
-			led[15] <= 1'b0;
 		end else if(curState == WRITE1) begin			
 			writeDataHalf <= writeData[63:32];
 			writeNow <= 1'd1;
 			if(curAddress == 13'd0)begin
-				led[17] <= 1'b1;
 			end else begin
 			end			
 		end else if(curState == WRITE2) begin
 			writeDataHalf <= writeData[31:0];
 			writeNow <= 1'd1;
 			if(curAddress == 13'd1)begin
-				led[16] <= 1'b1;	
 			end else if(curAddress == 13'd0)begin
-				led[15] <= 1'b1;
 			end else begin
 			end
 		end else begin
@@ -500,18 +484,18 @@ module mem_con(clk, rst,dram_addr, dram_ba, dram_cas_n, dram_cke, dram_clk, dram
 	// TroUBLESHOOTING
 	always@(posedge clk, negedge rst) begin
 		if(~rst) begin
-			
-			led[14] <= 1'b0;
-			
-			led[13] <= 1'b0;
-			led[12] <= 1'b0;
-			led[11] <= 1'b0;
-			led[10] <= 1'b0;
+			led[5]	<= 1'b0;
+			led[4]	<= 1'b0;
 			led[2] <= 1'b0;
 			led[3] <= 1'b0;
 		end else if(curState == WRITE1) begin
+			led[2] <= 1'b1;
 		end else if(curState == WRITE2) begin
-		
+			led[3] <= 1'b1;
+		end else if(curState == READ1) begin
+			led[4]	<= 1'b1;
+		end else if(valid) begin
+			led[5]	<= 1'b1;
 		end else begin
 		end		
 	end

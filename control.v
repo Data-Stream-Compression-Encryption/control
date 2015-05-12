@@ -7,7 +7,7 @@
 
 `timescale 1 ns/ 1 ps
 
-module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,stall, scon_done,dump_comp, valid_bits, valid_to_comp);
+module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_valid,comp_rdy,stall, scon_done, valid_bits, valid_to_comp);
   input clk;                
   input rst;
   
@@ -22,7 +22,7 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   output reg [63:0] error_code; // Identifies the last error encountered based on code
   output reg error;             // Indicates that an error occurred
   output reg out_valid;         // Indicates that the output of the DSEC module is valid
-  output reg dump_comp;         // Indicates to the compression module to send remaining data
+  //output reg dump_comp;         // Indicates to the compression module to send remaining data
   output reg valid_to_comp;     // Indicates that the data input to the compression module is valid
   
   input comp_rdy;               // Indicates that the compression module is ready for input
@@ -39,8 +39,8 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   // Register drivers
   // ==============================
   
-  always@( out_rcvd, rst, out_valid)
-    if(rst)
+  always@( out_rcvd, rst, out_valid, data_rcvd)
+    if(~rst)
       data_rcvd <= 1'b0;
     else if(out_valid == 1'b0)
       data_rcvd <= 1'b0;
@@ -87,10 +87,10 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   
   // Drive error
   always@(in_valid,rdy) begin
-    if(in_valid && ~rdy)
-      error <= 1;
+    if(in_valid && ~rdy && ~key_config)
+      error <= 1'b1;
     else
-      error <= 0;        
+      error <= 1'b0;        
   end
   
   // Drive out_valid 

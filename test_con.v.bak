@@ -1,0 +1,278 @@
+
+
+module test_con(clk, rst, address, w_rn, go, memValid, dsec_out_valid, dsec_in_valid, dsec_rdy, key_config, out_rcvd, dataToRead, fromTest, ledr);
+
+	// Clock and active-low reset
+	input clk;
+	input rst;
+	//	
+	
+	// Memory controller signals
+	output reg [12:0] address;
+	output reg w_rn;
+	input memValid;
+	output reg go;
+	input dataToRead;
+	output [63:0] fromTest;
+	//
+	
+	// DSEC control signals
+	output reg dsec_in_valid;
+	input dsec_out_valid;	
+	input dsec_rdy;
+	output reg out_rcvd;
+	output reg key_config;
+	//
+	
+	//Troubleshooting
+	output reg [7:0] ledr;
+	//
+	
+	// Stop the design if limit met
+	reg stop;
+	//
+	
+	// Working Addresses
+	reg [12:0] writeAddress;
+	reg [12:0] readAddress;
+	//
+	
+	// maximum address
+	parameter [12:0] maxAddress = 13'd1024;
+	//
+	
+	// Encryption Keys
+	parameter [63:0] key1 = 64'h1111111111111111;
+	parameter [63:0] key2 = 64'h2222222222222222;	
+	parameter [63:0] key3 = 64'h3333333333333333;
+	//
+	
+
+	
+	// State variables
+	reg [3:0] curState;
+	reg [3:0] nextState;
+	//	
+	
+	
+	
+	// States
+	parameter [3:0] IDLE = 4'd0;
+	parameter [3:0] READ_DATA = 4'd1;
+	parameter [3:0] WRITE_DATA = 4'd2;
+	parameter [3:0] KEY_CONFIG1 = 4'd3;
+	parameter [3:0] KEY_CONFIG2 = 4'd5;
+	parameter [3:0] KEY_CONFIG3 =  4'd7;
+	//
+		
+	// State Transitions 	
+	always@(posedge clk, negedge rst) begin
+			if(~rst) 
+				curState <= KEY_CONFIG1;
+			else	
+				curState <= nextState;	
+	end
+	//
+	
+	// State Machine
+	always@(curState,dsec_out_valid, dsec_rdy, memValid, stop) begin
+		case(curState)
+			IDLE: begin
+				if(stop) begin
+					nextState = IDLE;
+				end else if(dsec_out_valid)begin
+					nextState = WRITE_DATA;
+				end else if(dsec_rdy)begin
+					nextState = READ_DATA;
+				end else begin
+					nextState = IDLE;
+				end
+			end	
+			READ_DATA:begin
+				if(memValid)begin
+					nextState = IDLE;
+				end else begin
+					nextState = READ_DATA;
+				end
+			end
+			WRITE_DATA:begin
+				if(memValid)begin
+					nextState = IDLE;
+				end else begin
+					nextState = WRITE_DATA;
+				end
+			end
+			KEY_CONFIG1:begin
+				if(dsec_rdy)begin
+					nextState = KEY_CONFIG2;
+				end else begin
+					nextState = KEY_CONFIG1;
+				end
+			end
+			KEY_CONFIG2:begin
+				if(dsec_rdy)begin
+					nextState = KEY_CONFIG3;
+				end else begin
+					nextState = KEY_CONFIG2;
+				end
+			end
+			KEY_CONFIG3:begin
+				if(dsec_rdy)begin
+					nextState = IDLE;
+				end else begin
+					nextState = KEY_CONFIG3;
+				end
+			end
+			default:begin
+				nextState = IDLE;
+			end
+		endcase
+	end
+	//
+	
+	// Drive address
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				address <= 13'd0;
+			end else if(curState==READ_DATA) begin
+				address <= readAddress;
+			end else if(curState==WRITE_DATA) begin
+				address <= writeAddress;
+			end else begin
+				address <= 13'd0;
+			end
+	end
+	//
+	
+	// Drive writeAddress
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				writeAddress <= 13'd0;
+			end else if(curState==WRITE_DATA && nextState==IDLE) begin
+				writeAddress <= writeAddress + 13'd2;
+				if(writeAddress >= maxAddress) begin
+					writeAddress <= 13'd0;
+				end
+			end else begin
+				writeAddress <= writeAddress;
+			end
+	end
+	//
+	
+	// Drive readAddress
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				readAddress <= 13'd0;
+			end else if(curState==READ_DATA && nextState==IDLE) begin
+				readAddress <= readAddress + 13'd2;
+				if(readAddress >= maxAddress) begin
+					readAddress <= 13'd0;
+				end
+			end else begin
+				readAddress <= readAddress;
+			end
+	end
+	//	
+	
+	// Drive w_rn
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				w_rn <= 1'd0;
+			end else if(curState == READ_DATA) begin
+				w_rn <= 1'b0;
+			end else if(curState == WRITE_DATA) begin
+				w_rn <= 1'b1;
+			end else begin
+				w_rn <= w_rn;
+			end
+	end
+	//	
+	
+	// Drive go
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				go <= 1'd0;
+			end else if(curState == READ_DATA) begin
+				go <= 1'b1;
+			end else if(curState == WRITE_DATA) begin
+				go <= 1'b1;
+			end else begin
+				go <= 1'b0;
+			end
+	end
+	//	
+
+	// Drive dsec_in_valid
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				dsec_in_valid <= 1'd0;
+			end else if(curState==READ_DATA && nextState==IDLE) begin
+				dsec_in_valid <= 1'd1;
+			end else begin
+				dsec_in_valid <= 1'd0;
+			end
+	end
+	//		
+	
+	// Drive out_rcvd
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				out_rcvd <= 1'b0;
+			end else if(curState==WRITE_DATA && nextState==IDLE) begin
+				out_rcvd <= 1'b1;
+			end else begin
+				out_rcvd <= 1'b1;
+			end
+	end
+	//	
+	
+	// Drive key_config
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				key_config <= 1'b1;
+			end else if(curState == KEY_CONFIG1 || curState == KEY_CONFIG2 || curState == KEY_CONFIG3) begin
+				key_config <= 1'b1;
+			end else begin
+				key_config <= 1'b0;
+			end
+	end
+	//	
+	
+	// Drive stop
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				stop <= 1'b0;
+			end else if(readAddress >= maxAddress) begin
+				stop <= 1'b1;
+			end else if(writeAddress >= maxAddress) begin
+				stop <= 1'b1;
+			end else begin
+				stop <= stop;
+			end
+	end
+	//
+	
+	assign fromTest = (curState == KEY_CONFIG1)? key1 :
+		(curState == KEY_CONFIG2)? key2 :
+		(curState == KEY_CONFIG3)? key3 :
+		dataToRead;
+
+  // Drive leds for troubleshooting
+	always@(posedge clk, negedge rst) begin
+			if(~rst)begin
+				ledr<=8'b0;
+			end else if(dsec_out_valid)begin
+				ledr[4] <= 1'b1;
+			end else if(curState == IDLE) begin		
+				ledr[7]<=1'b1;
+			end else if(curState == READ_DATA) begin
+				ledr[6]<=1'b1;
+			end else if(curState == WRITE_DATA) begin
+				ledr[5]<=1'b1;
+			end else begin
+			end
+	end
+	//	
+	
+	
+endmodule
