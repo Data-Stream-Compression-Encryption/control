@@ -87,10 +87,13 @@ module control(clk,rst,key_config,in_valid,out_rcvd,rdy,error,error_code,out_val
   
   // Drive error
   always@(in_valid,rdy) begin
+		error <= 1'b0; 
+		/*
     if(in_valid && ~rdy && ~key_config)
       error <= 1'b1;
     else
-      error <= 1'b0;        
+      error <= 1'b0;       
+		*/
   end
   
   // Drive out_valid 

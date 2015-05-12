@@ -38,7 +38,7 @@ module dsec(clk,rst,data_in,key_config,in_valid,out_rcvd,rdy,data_out,error,out_
   shift_concat shift_concat1(.clk(clk),.rst(rst),.stall(stall),.data_in(comp_out),.valid_bits(valid_bits),.msg_fin(dump_comp),.data_out(encrypt_in),.done(scon_done));
   control control1(.clk(clk),.rst(rst),.key_config(key_config),.in_valid(in_valid),.out_rcvd(out_rcvd),.rdy(rdy),.error(error),.error_code(error_code),.out_valid(out_valid),.comp_rdy(comp_rdy),.stall(stall), .scon_done(scon_done), .valid_bits(valid_bits), .valid_to_comp(valid_to_comp));
   //dummy_compression dummy_compression1(.clk(clk),.rst(rst),.valid_to_comp(valid_to_comp),.valid_bits(valid_bits),.comp_rdy(comp_rdy),.stall_comp(stall),.dump(dump_comp),.data_in(comp_in),.data_out(comp_out));
-  Compression_Top compression1(.clock(clk), .reset(~rst), .stall(stall), .data_in_valid(valid_to_comp),.data_in(comp_in),.comp_rdy(comp_rdy), .dump(dump_comp),.valid_bits(valid_bits),.data_out(comp_out));
+  Compression_Top compression1(.clock(clk), .reset(rst), .stall(stall), .data_in_valid(valid_to_comp),.data_in(comp_in),.comp_rdy(comp_rdy), .dump(dump_comp),.valid_bits(valid_bits),.data_out(comp_out));
   TripleDES_Encryption TripleDES_Encryption1(.data_in(encrypt_in), .data_out(encrypt_out), .key_1(key_1), .key_2(key_2), .key_3(key_3));
   
   
